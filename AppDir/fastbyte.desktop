@@ -1,7 +1,6 @@
 [Desktop Entry]
-Name=FastByte Diagnostic Tool
-Exec=AppRun
+Name=FastByte
+Exec=FastByte
 Icon=fastbyte
 Type=Application
 Categories=System;Utility;
-Terminal=false

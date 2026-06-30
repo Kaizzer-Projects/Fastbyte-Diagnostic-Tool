@@ -84,42 +84,49 @@ class MainWindow(QMainWindow):
 
         self.build_ui()
 
-    # ================= PADRÃO DE PÁGINA (OFFSET VISUAL) =================
-    def page_layout(self, widget):
-        layout = QVBoxLayout(widget)
+    # ================= SEGURANÇA THREAD =================
+    def closeEvent(self, event):
+        try:
+            if hasattr(self, "worker"):
+                self.worker.terminate()
+                self.worker.wait()
+        except:
+            pass
+        event.accept()
 
-        # 🔥 AQUI É O AJUSTE QUE VOCÊ PEDIU
-        layout.setContentsMargins(20, 25, 20, 20)  # topo maior = +2 linhas visuais
-        layout.setSpacing(12)
-
-        return layout
-
-    # ================= STATUS =================
+    # ================= HELPERS DE STATUS (RESTAURADOS) =================
     def cpu_msg(self, v):
         if v < 30:
             return "🟢 Sistema fluido (uso baixo)"
         elif v <= 60:
             return "🟡 Uso moderado"
-        return "🔴 Uso alto"
+        return "🔴 CPU sobrecarregada"
 
     def ram_msg(self, v):
         if v < 35:
-            return "🟢 RAM ok"
+            return "🟢 Memória livre e estável"
         elif v <= 70:
-            return "🟡 RAM moderada"
+            return "🟡 Uso moderado de RAM"
         return "🔴 RAM crítica"
 
     def disk_msg(self, v):
         if v < 70:
             return "🟢 Disco saudável"
         elif v < 85:
-            return "🟡 Atenção no disco"
-        return "🔴 Disco crítico"
+            return "🟡 Atenção no espaço em disco"
+        return "🔴 Disco quase cheio"
 
     # ================= UI =================
+    def page_layout(self, widget):
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(20, 25, 20, 20)
+        layout.setSpacing(12)
+        return layout
+
+    # ================= BUILD UI =================
     def build_ui(self):
 
-        # ================= SISTEMA =================
+        # ===== SISTEMA =====
         sys = self.page_layout(self.page_sys)
 
         self.sys_cpu_model = QLabel()
@@ -148,7 +155,7 @@ class MainWindow(QMainWindow):
 
         sys.addStretch()
 
-        # ================= CPU =================
+        # ===== CPU =====
         cpu = self.page_layout(self.page_cpu)
 
         self.cpu_model = QLabel()
@@ -162,7 +169,7 @@ class MainWindow(QMainWindow):
         cpu.addWidget(self.cpu_bar)
         cpu.addStretch()
 
-        # ================= RAM =================
+        # ===== RAM =====
         ram = self.page_layout(self.page_ram)
 
         self.ram_status = QLabel()
@@ -176,7 +183,7 @@ class MainWindow(QMainWindow):
         ram.addWidget(self.ram_bar)
         ram.addStretch()
 
-        # ================= DISCO =================
+        # ===== DISCO =====
         disk = self.page_layout(self.page_disk)
 
         self.disk_status = QLabel()
@@ -190,9 +197,8 @@ class MainWindow(QMainWindow):
         disk.addWidget(self.disk_bar)
         disk.addStretch()
 
-    # ================= UPDATE =================
+    # ================= UPDATE (COM INTELIGÊNCIA RESTAURADA) =================
     def update(self, d):
-
         if not d:
             return
 
@@ -212,7 +218,7 @@ class MainWindow(QMainWindow):
         # CPU
         self.cpu_model.setText(f"Modelo: {d.get('cpu_name','')}")
         self.cpu_status.setText(self.cpu_msg(d.get("cpu", 0)))
-        self.cpu_clock.setText(f"Velocidade: {d.get('cpu_mhz',0):.0f} MHz")
+        self.cpu_clock.setText(f"Clock: {d.get('cpu_mhz',0):.0f} MHz")
         self.cpu_bar.setValue(d.get("cpu", 0))
 
         # RAM
@@ -223,10 +229,11 @@ class MainWindow(QMainWindow):
 
         # DISCO
         self.disk_status.setText(self.disk_msg(d.get("disk", 0)))
-        self.disk_detail.setText(f"Uso: {d.get('disk',0):.1f}% | Livre: {d.get('disk_free_gb',0):.2f} GB")
-        self.disk_health.setText(d.get("disk_health",""))
+        self.disk_detail.setText(f"Livre: {d.get('disk_free_gb',0):.2f} GB")
+        self.disk_health.setText(d.get("diagnosis",""))
         self.disk_bar.setValue(d.get("disk", 0))
 
+    # ================= RELATÓRIO =================
     def generate_report(self):
         path, _ = QFileDialog.getSaveFileName(
             self, "Salvar relatório", "relatorio_fastbyte.pdf", "PDF (*.pdf)"

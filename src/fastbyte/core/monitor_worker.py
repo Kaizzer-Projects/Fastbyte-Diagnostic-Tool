@@ -19,7 +19,7 @@ class MonitorWorker(QThread):
 
     def run(self):
 
-        while True:
+        while not self.isInterruptionRequested():
 
             cpu = psutil.cpu_percent(interval=None)
             ram = psutil.virtual_memory()
@@ -32,7 +32,6 @@ class MonitorWorker(QThread):
 
             cpu_name = self.get_cpu_name()
 
-            # ================= PROCESSOS =================
             procs = []
             for p in psutil.process_iter(['pid', 'name']):
                 try:
@@ -51,38 +50,33 @@ class MonitorWorker(QThread):
                 reverse=True
             )[:5]
 
-            # ================= DIAGNÓSTICO INTELIGENTE =================
             diagnosis = self.generate_diagnosis(cpu, ram, disk)
 
             data = {
-                # CPU
                 "cpu": cpu,
                 "cpu_mhz": cpu_mhz,
                 "cpu_name": cpu_name,
 
-                # RAM
                 "ram": ram.percent,
                 "ram_used_gb": ram.used / (1024**3),
                 "ram_total_gb": ram.total / (1024**3),
                 "ram_freq": self.get_ram_freq(),
                 "ram_slots": self.safe_ram_slots(),
 
-                # DISK
                 "disk": disk.percent,
                 "disk_free_gb": disk.free / (1024**3),
                 "disk_total_gb": disk.total / (1024**3),
 
-                # PROCESSOS
                 "top_processes": top_procs,
-
-                # 🧠 NOVO
                 "diagnosis": diagnosis
             }
 
             self.data.emit(data)
             time.sleep(1)
 
-    # ================= DIAGNÓSTICO =================
+        self.quit()
+        return
+
     def generate_diagnosis(self, cpu, ram, disk):
 
         issues = []
@@ -104,7 +98,6 @@ class MonitorWorker(QThread):
 
         return " | ".join(issues)
 
-    # ================= CPU NAME =================
     def get_cpu_name(self):
         try:
             with open("/proc/cpuinfo", "r") as f:
@@ -116,7 +109,6 @@ class MonitorWorker(QThread):
 
         return platform.processor() or "CPU desconhecido"
 
-    # ================= RAM FREQ =================
     def get_ram_freq(self):
         try:
             import subprocess
@@ -125,7 +117,6 @@ class MonitorWorker(QThread):
         except:
             return "N/A"
 
-    # ================= SLOTS SAFE =================
     def safe_ram_slots(self):
         try:
             import subprocess

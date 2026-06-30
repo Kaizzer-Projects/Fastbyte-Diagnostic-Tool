@@ -1,4 +1,8 @@
-from .app import run
+import sys
+from fastbyte.app import run
 
-run()
+def main():
+    run()
 
+if __name__ == "__main__":
+    main()

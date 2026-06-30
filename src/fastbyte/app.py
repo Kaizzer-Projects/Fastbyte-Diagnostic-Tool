@@ -1,8 +1,7 @@
 import sys
-
 from PySide6.QtWidgets import QApplication
 
-from .main_window import MainWindow
+from fastbyte.main_window import MainWindow
 
 
 def run():
