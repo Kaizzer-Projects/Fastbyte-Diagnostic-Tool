@@ -1,194 +1,257 @@
-import sys
-import psutil
-import cpuinfo
-import subprocess
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtGui, QtCore
+from fastbyte.core.system_worker import SystemWorker
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+
         self.setWindowTitle("FastByte Diagnostic Tool")
         self.setFixedSize(1280, 720)
 
-        info = cpuinfo.get_cpu_info()
-        self.cpu_model = info.get("brand_raw", "N/A")
-        self.cpu_vendor = info.get("vendor_id_raw", "N/A")
-        self.cpu_cores = psutil.cpu_count(logical=False)
-        self.cpu_threads = psutil.cpu_count(logical=True)
+        self.cache = {}
 
         self.setStyleSheet("""
             QMainWindow { background-color: #121212; }
-            QLabel { color: #E0E0E0; font-family: 'Inter'; font-size: 14px; }
+            QLabel { color: #E0E0E0; font-size: 14px; }
             QPushButton {
-                background-color: #3A6EA5; color: white; border-radius: 6px;
-                padding: 6px 12px; font-family: 'Inter'; font-weight: bold;
+                background-color: #3A6EA5;
+                color: white;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-weight: bold;
             }
             QPushButton:hover { background-color: #558CC9; }
             QFrame { background-color: #1E1E1E; border-radius: 8px; padding: 10px; }
         """)
 
-        central_widget = QtWidgets.QWidget()
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
-        self.setCentralWidget(central_widget)
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+        layout = QtWidgets.QVBoxLayout(central)
 
-        # Cabeçalho
-        header_frame = QtWidgets.QFrame()
-        header_layout = QtWidgets.QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(10, 10, 10, 10)
-        header_layout.setSpacing(10)
+        # ================= HEADER =================
+        header = QtWidgets.QFrame()
+        header_layout = QtWidgets.QHBoxLayout(header)
 
         logo = QtWidgets.QLabel()
-        pixmap = QtGui.QPixmap("src/fastbyte/resources/fastbyte.png")
-        pixmap = pixmap.scaled(60, 60, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        pixmap = QtGui.QPixmap("fastbyte.png")
+
+        # 🔥 LOGO AUMENTADA
+        pixmap = pixmap.scaled(
+            80, 80,
+            QtCore.Qt.KeepAspectRatio,
+            QtCore.Qt.SmoothTransformation
+        )
+
         logo.setPixmap(pixmap)
 
-        header = QtWidgets.QLabel("FastByte - Diagnóstico do Sistema")
-        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #FFFFFF;")
+        title = QtWidgets.QLabel("FastByte - Diagnóstico do Sistema")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: white;")
 
-        header_layout.addWidget(logo, alignment=QtCore.Qt.AlignLeft)
-        header_layout.addWidget(header, alignment=QtCore.Qt.AlignLeft)
+        header_layout.addWidget(logo)
+        header_layout.addWidget(title)
         header_layout.addStretch()
-        main_layout.addWidget(header_frame)
 
-        # Diagnóstico rápido
-        self.diagnosis_label = QtWidgets.QLabel()
-        self.diagnosis_label.setStyleSheet("font-size: 14px; color: #FFD700;")
-        main_layout.addWidget(self.diagnosis_label)
+        layout.addWidget(header)
+
+        # ================= DIAGNÓSTICO =================
+        self.diagnosis = QtWidgets.QLabel()
+        self.diagnosis.setStyleSheet("color: #FFD700;")
+        layout.addWidget(self.diagnosis)
 
         grid = QtWidgets.QGridLayout()
-        main_layout.addLayout(grid)
+        layout.addLayout(grid)
 
-        # CPU card
-        self.cpu_summary = QtWidgets.QLabel()
-        self.cpu_button = QtWidgets.QPushButton("Ver detalhes da CPU")
-        self.cpu_button.clicked.connect(self.toggle_cpu_details)
+        # CPU
+        self.cpu = QtWidgets.QLabel()
         self.cpu_details = QtWidgets.QLabel()
         self.cpu_details.setVisible(False)
-        cpu_card = self.create_card("🖥️ CPU", self.cpu_summary, self.cpu_button, self.cpu_details)
-        grid.addWidget(cpu_card, 0, 0)
+        self.cpu_btn = QtWidgets.QPushButton("Detalhes CPU")
+        self.cpu_btn.clicked.connect(self.toggle_cpu)
+        grid.addWidget(self.card("🖥️ CPU", self.cpu, self.cpu_btn, self.cpu_details), 0, 0)
 
-        # RAM card
-        self.ram_summary = QtWidgets.QLabel()
-        self.ram_button = QtWidgets.QPushButton("Ver detalhes da RAM")
-        self.ram_button.clicked.connect(self.toggle_ram_details)
+        # RAM
+        self.ram = QtWidgets.QLabel()
         self.ram_details = QtWidgets.QLabel()
         self.ram_details.setVisible(False)
-        ram_card = self.create_card("💾 RAM", self.ram_summary, self.ram_button, self.ram_details)
-        grid.addWidget(ram_card, 0, 1)
+        self.ram_btn = QtWidgets.QPushButton("Detalhes RAM")
+        self.ram_btn.clicked.connect(self.toggle_ram)
+        grid.addWidget(self.card("💾 RAM", self.ram, self.ram_btn, self.ram_details), 0, 1)
 
-        # Disco card
-        self.disk_label = QtWidgets.QLabel()
-        disk_card = self.create_card("📂 Disco", self.disk_label)
-        grid.addWidget(disk_card, 0, 2)
+        # DISCO
+        self.disk = QtWidgets.QLabel()
+        self.disk_details = QtWidgets.QLabel()
+        self.disk_details.setVisible(False)
+        self.disk_btn = QtWidgets.QPushButton("Detalhes Disco")
+        self.disk_btn.clicked.connect(self.toggle_disk)
+        grid.addWidget(self.card("📂 DISCO", self.disk, self.disk_btn, self.disk_details), 0, 2)
 
-        # Botões
-        btn_layout = QtWidgets.QHBoxLayout()
-        main_layout.addLayout(btn_layout)
-        btn_refresh = QtWidgets.QPushButton("Atualizar")
-        btn_report = QtWidgets.QPushButton("Gerar Relatório")
-        btn_settings = QtWidgets.QPushButton("Configurações")
-        btn_refresh.clicked.connect(self.update_stats)
-        btn_report.clicked.connect(self.generate_report)
-        btn_settings.clicked.connect(self.open_settings)
-        btn_layout.addWidget(btn_refresh)
-        btn_layout.addWidget(btn_report)
-        btn_layout.addWidget(btn_settings)
+        # BOTÕES
+        btns = QtWidgets.QHBoxLayout()
 
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.update_stats)
-        self.timer.start(2000)
-        self.update_stats()
+        self.btn_update = QtWidgets.QPushButton("Atualizar")
+        self.btn_report = QtWidgets.QPushButton("Gerar Relatório")
+        self.btn_settings = QtWidgets.QPushButton("Configurações")
 
-    def create_card(self, title, content_label, button=None, details=None):
-        frame = QtWidgets.QFrame()
-        layout = QtWidgets.QVBoxLayout(frame)
-        lbl_title = QtWidgets.QLabel(title)
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #FFFFFF;")
-        content_label.setStyleSheet("font-size: 14px; color: #E0E0E0;")
-        layout.addWidget(lbl_title)
-        layout.addWidget(content_label)
-        if button:
-            layout.addWidget(button)
+        self.btn_update.clicked.connect(self.force_update)
+        self.btn_report.clicked.connect(self.report)
+        self.btn_settings.clicked.connect(self.settings)
+
+        btns.addWidget(self.btn_update)
+        btns.addWidget(self.btn_report)
+        btns.addWidget(self.btn_settings)
+
+        layout.addLayout(btns)
+
+        self.worker = SystemWorker()
+        self.worker.data_ready.connect(self.update_ui)
+        self.worker.start()
+
+    # ================= CARD =================
+    def card(self, title, label, btn=None, details=None):
+        w = QtWidgets.QFrame()
+        l = QtWidgets.QVBoxLayout(w)
+
+        t = QtWidgets.QLabel(title)
+        t.setStyleSheet("font-weight: bold; font-size: 16px; color: white;")
+
+        l.addWidget(t)
+        l.addWidget(label)
+
+        if btn:
+            l.addWidget(btn)
         if details:
-            layout.addWidget(details)
-        return frame
+            l.addWidget(details)
 
-    def get_ram_info_linux(self):
-        try:
-            output = subprocess.check_output(["dmidecode", "-t", "memory"], text=True)
-            slots_used = output.count("Size:")
-            freq_lines = [line for line in output.splitlines() if "Speed:" in line and "Configured" not in line]
-            freq = freq_lines[0].split(":")[1].strip() if freq_lines else "N/A"
-            if "ChannelA" in output and "ChannelB" in output:
-                channel = "Dual-channel"
-            elif "ChannelA" in output:
-                channel = "Single-channel"
-            else:
-                channel = "Informação não disponível"
-            return slots_used, freq, channel
-        except Exception:
-            return "N/A", "N/A", "N/A"
+        return w
 
-    def update_stats(self):
-        freq = psutil.cpu_freq()
-        cpu_clock = f"{freq.current:.2f} MHz" if freq else "N/A"
-        self.cpu_summary.setText(f"Modelo: {self.cpu_model}\nClock Atual: {cpu_clock}")
+    # ================= DISCO =================
+    def normalize_disks(self, disk_data):
+        if isinstance(disk_data, list):
+            return [d for d in disk_data if isinstance(d, dict)]
+        if isinstance(disk_data, dict):
+            return [disk_data]
+        return []
 
-        ram = psutil.virtual_memory()
-        total_ram_gb = round(ram.total / (1024**3), 2)
-        used_ram_gb = round(ram.used / (1024**3), 2)
-        self.ram_summary.setText(f"Total instalado: {total_ram_gb} GB\nUso atual: {used_ram_gb} GB ({ram.percent}%)")
+    # ================= UPDATE =================
+    def update_ui(self, d):
+        self.cache = d
 
-        disk = psutil.disk_usage('/')
-        self.disk_label.setText(f"Uso atual: {disk.percent}%")
+        cpu = d["cpu"]
+        ram = d["ram"]
+        disk_list = self.normalize_disks(d.get("disk", []))
 
-        diagnosis = []
-        if ram.percent > 85:
-            diagnosis.append(f"⚠️ RAM em {ram.percent}%, risco de falta de memória.")
-        if disk.percent > 90:
-            diagnosis.append(f"⚠️ Disco em {disk.percent}%, pouco espaço disponível.")
-        if freq and freq.current > freq.max * 0.95:
-            diagnosis.append("⚠️ CPU operando próximo ao limite de clock.")
-        if not diagnosis:
-            diagnosis.append("✅ Sistema em condições normais.")
-        self.diagnosis_label.setText("\n".join(diagnosis))
+        cpu_clock = f"{cpu['current_clock']/1000:.2f} GHz"
+        base_clock = f"{cpu['base_clock']/1000:.2f} GHz"
+
+        self.cpu.setText(
+            f"Modelo: {cpu['model']}\n"
+            f"Uso: {cpu['percent']}%\n"
+            f"Atual: {cpu_clock}\n"
+            f"Base: {base_clock}"
+        )
+
+        self.ram.setText(
+            f"{ram['percent']}% | {ram['used_gb']}GB/{ram['total_gb']}GB"
+        )
+
+        total_disk = max((d.get("percent", 0) for d in disk_list), default=0)
+        self.disk.setText(f"{total_disk}%")
+
+        self.diagnose(cpu, ram, disk_list)
 
         if self.cpu_details.isVisible():
             self.cpu_details.setText(
-                f"Modelo: {self.cpu_model}\n"
-                f"Fabricante: {self.cpu_vendor}\n"
-                f"Núcleos: {self.cpu_cores}\n"
-                f"Threads: {self.cpu_threads}\n"
-                f"Clock Base: {freq.max:.2f} MHz\n"
-                f"Clock Atual: {cpu_clock}"
+                f"Modelo: {cpu['model']}\n"
+                f"Fabricante: {cpu['vendor']}\n"
+                f"Núcleos: {cpu['cores']}\n"
+                f"Threads: {cpu['threads']}\n"
+                f"Clock Atual: {cpu_clock}\n"
+                f"Clock Base: {base_clock}"
             )
 
         if self.ram_details.isVisible():
-            slots, freq_ram, channel = self.get_ram_info_linux()
             self.ram_details.setText(
-                f"Total instalado: {total_ram_gb} GB\n"
-                f"Uso atual: {used_ram_gb} GB ({ram.percent}%)\n"
-                f"Frequência atual: {freq_ram}\n"
-                f"Slots usados: {slots}\n"
-                f"Channel: {channel}"
+                f"Total: {ram['total_gb']} GB\n"
+                f"Usado: {ram['used_gb']} GB\n"
+                f"Uso: {ram['percent']}%"
             )
 
-    def toggle_cpu_details(self):
+        if self.disk_details.isVisible():
+            text = ""
+            for i, dsk in enumerate(disk_list):
+                text += (
+                    f"\nDisco {i+1}:\n"
+                    f"Uso: {dsk.get('percent',0)}%\n"
+                    f"Total: {dsk.get('total_gb',0)} GB\n"
+                    f"Usado: {dsk.get('used_gb',0)} GB\n"
+                    f"Livre: {dsk.get('free_gb',0)} GB\n"
+                    f"Saúde: {self.disk_health(dsk.get('percent',0))}\n"
+                )
+            self.disk_details.setText(text)
+
+    # ================= DIAGNÓSTICO COMPLETO (RESTORED FULL VERSION) =================
+    def diagnose(self, cpu, ram, disk_list):
+        msg = []
+
+        cpu_load = cpu["percent"]
+        ram_load = ram["percent"]
+        disk_load = max((d.get("percent", 0) for d in disk_list), default=0)
+
+        # CPU
+        if cpu_load < 30:
+            msg.append("🟢 CPU: baixa utilização, sistema altamente responsivo com ampla margem de processamento livre.")
+        elif cpu_load < 60:
+            msg.append("🟡 CPU: uso moderado, múltiplos processos ativos sem impacto crítico no desempenho.")
+        elif cpu_load < 85:
+            msg.append("🟠 CPU: carga elevada, possível redução perceptível de performance em tarefas pesadas.")
+        else:
+            msg.append("🔴 CPU: saturação crítica, risco alto de travamentos e lentidão geral.")
+
+        # RAM
+        if ram_load < 50:
+            msg.append("🟢 RAM: uso eficiente, grande disponibilidade de memória para multitarefa.")
+        elif ram_load < 75:
+            msg.append("🟡 RAM: consumo moderado, diversos aplicativos em execução simultânea.")
+        elif ram_load < 90:
+            msg.append("🟠 RAM: pressão elevada, possível uso de swap e lentidão em multitarefa.")
+        else:
+            msg.append("🔴 RAM: estado crítico, forte risco de travamentos por falta de memória.")
+
+        # DISCO
+        if disk_load < 40:
+            msg.append("🟢 DISCO: espaço abundante, operação segura e estável.")
+        elif disk_load < 70:
+            msg.append("🟡 DISCO: uso crescente, recomenda monitoramento e limpeza futura.")
+        elif disk_load < 90:
+            msg.append("🟠 DISCO: espaço limitado, ação de limpeza recomendada.")
+        else:
+            msg.append("🔴 DISCO: crítico, risco de falha operacional por falta de armazenamento.")
+
+        self.diagnosis.setText("\n".join(msg))
+
+    def disk_health(self, p):
+        if p < 70:
+            return "🟢 Bom"
+        elif p < 85:
+            return "🟡 Atenção"
+        return "🔴 Crítico"
+
+    def toggle_cpu(self):
         self.cpu_details.setVisible(not self.cpu_details.isVisible())
-        self.update_stats()
 
-    def toggle_ram_details(self):
+    def toggle_ram(self):
         self.ram_details.setVisible(not self.ram_details.isVisible())
-        self.update_stats()
 
-    def generate_report(self):
-        QtWidgets.QMessageBox.information(self, "Relatório", "Função de relatório em desenvolvimento.")
+    def toggle_disk(self):
+        self.disk_details.setVisible(not self.disk_details.isVisible())
 
-    def open_settings(self):
-        QtWidgets.QMessageBox.information(self, "Configurações", "Tela de configurações em desenvolvimento.")
+    def force_update(self):
+        if self.cache:
+            self.update_ui(self.cache)
 
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+    def report(self):
+        QtWidgets.QMessageBox.information(self, "Relatório", "Em desenvolvimento")
+
+    def settings(self):
+        QtWidgets.QMessageBox.information(self, "Configurações", "Em desenvolvimento")

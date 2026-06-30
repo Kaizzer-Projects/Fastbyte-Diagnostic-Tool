@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Fastbyte Diagnostic Tool
+Exec=FastbyteDiagnosticTool
+Icon=fastbyte
+Type=Application
+Categories=Utility;System;
+Comment=Ferramenta de Diagnóstico Fastbyte

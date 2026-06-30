@@ -1,6 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication
-
+from PyQt5.QtWidgets import QApplication
 from fastbyte.main_window import MainWindow
 
 
@@ -10,4 +9,4 @@ def run():
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec())
+    sys.exit(app.exec_())

@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/fastbyte/__init__.py
+src/fastbyte/__main__.py
+src/fastbyte/app.py
+src/fastbyte/main.py
+src/fastbyte/main_window.py
+src/fastbyte.egg-info/PKG-INFO
+src/fastbyte.egg-info/SOURCES.txt
+src/fastbyte.egg-info/dependency_links.txt
+src/fastbyte.egg-info/top_level.txt
+src/fastbyte/core/diagnostic.py
+src/fastbyte/core/gpu.py
+src/fastbyte/core/monitor_worker.py
+src/fastbyte/core/reports.py
+src/fastbyte/core/system.py

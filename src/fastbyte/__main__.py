@@ -1,4 +1,3 @@
-import sys
 from fastbyte.app import run
 
 def main():
